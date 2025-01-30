@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parcel Delivery System</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Parcel Delivery System</h1>
+      <p>Calculate delivery charges and fuel costs using city names</p>
+    </header>
+
+    <!-- Input Section -->
+    <div class="input-section">
+      <label for="parcels">Number of Parcels:</label>
+      <input type="number" id="parcels" min="1" required>
+
+      <label for="start-city">Starting City:</label>
+      <select id="start-city">
+        <option value="Mirpur">Mirpur</option>
+        <option value="Uttara">Uttara</option>
+        <option value="Badda">Badda</option>
+        <option value="Farmgate">Farmgate</option>
+        <option value="Puran Dhaka">Puran Dhaka</option>
+      </select>
+
+      <div id="parcel-destinations"></div>
+      <button onclick="calculate()">Calculate</button>
+    </div>
+
+    <!-- Results Section -->
+    <div class="results-section" id="results" style="display: none;">
+      <h2>Results</h2>
+      <div id="shortest-paths"></div>
+      <div id="charges"></div>
+      <div id="fuel-cost"></div>
+    </div>
+  </div>
+
+  <script>
+    // City graph data (adjacency matrix)
+    const cityGraph = [
+      [0, 10, 20, 0, 0],
+      [10, 0, 5, 15, 0],
+      [20, 5, 0, 30, 10],
+      [0, 15, 30, 0, 5],
+      [0, 0, 10, 5, 0]
+    ];
+
+    const cities = ["Mirpur", "Uttara", "Badda", "Farmgate", "Puran Dhaka"];
+    const fuelOptions = [1, 5, 10];
+    const fuelCosts = [10, 45, 80];
+    const chargePerKm = 55;
+
+    // Initialize parcel destinations dynamically
+    document.getElementById('parcels').addEventListener('input', function(e) {
+      const numParcels = e.target.value;
+      let html = '';
+      for (let i = 1; i <= numParcels; i++) {
+        html += `
+          <label>Parcel ${i} Destination:</label>
+          <select class="parcel-dest">
+            ${cities.map(city => `<option value="${city}">${city}</option>`).join('')}
+          </select>
+        `;
+      }
+      document.getElementById('parcel-destinations').innerHTML = html;
+    });
+
+    // Dijkstra's Algorithm (JavaScript implementation)
+    function dijkstra(graph, src) {
+      const n = graph.length;
+      const dist = new Array(n).fill(Infinity);
+      const visited = new Array(n).fill(false);
+      dist[src] = 0;
+
+      for (let count = 0; count < n - 1; count++) {
+        const u = minDistance(dist, visited);
+        visited[u] = true;
+
+        for (let v = 0; v < n; v++) {
+          if (!visited[v] && graph[u][v] && dist[u] + graph[u][v] < dist[v]) {
+            dist[v] = dist[u] + graph[u][v];
+          }
+        }
+      }
+      return dist;
+    }
+
+    function minDistance(dist, visited) {
+      let min = Infinity;
+      let minIndex = -1;
+      for (let v = 0; v < dist.length; v++) {
+        if (!visited[v] && dist[v] <= min) {
+          min = dist[v];
+          minIndex = v;
+        }
+      }
+      return minIndex;
+    }
+
+    // Fuel Cost Calculator (Dynamic Programming)
+    function minFuelCost(requiredFuel) {
+      const dp = new Array(requiredFuel + 1).fill(Infinity);
+      dp[0] = 0;
+
+      for (let i = 0; i < fuelOptions.length; i++) {
+        for (let j = fuelOptions[i]; j <= requiredFuel; j++) {
+          if (dp[j - fuelOptions[i]] !== Infinity) {
+            dp[j] = Math.min(dp[j], dp[j - fuelOptions[i]] + fuelCosts[i]);
+          }
+        }
+      }
+      return dp[requiredFuel] === Infinity ? -1 : dp[requiredFuel];
+    }
+
+    // Main Calculation Function
+    function calculate() {
+      const startCity = document.getElementById('start-city').value;
+      const startIndex = cities.indexOf(startCity);
+      const distances = dijkstra(cityGraph, startIndex);
+
+      // Display shortest paths
+      let pathsHtml = '<h3>Shortest Paths:</h3>';
+      cities.forEach((city, i) => {
+        pathsHtml += `<p>To ${city}: ${distances[i]} km</p>`;
+      });
+      document.getElementById('shortest-paths').innerHTML = pathsHtml;
+
+      // Calculate charges
+      const parcelDests = [...document.getElementsByClassName('parcel-dest')];
+      let totalCharge = 0;
+      let chargesHtml = '<h3>Charges:</h3>';
+
+      parcelDests.forEach((dest, i) => {
+        const destIndex = cities.indexOf(dest.value);
+        const charge = distances[destIndex] * chargePerKm;
+        totalCharge += charge;
+        chargesHtml += `<p>Parcel ${i + 1} to ${dest.value}: ${charge} taka</p>`;
+      });
+
+      chargesHtml += `<h4>Total Charge: ${totalCharge} taka</h4>`;
+      document.getElementById('charges').innerHTML = chargesHtml;
+
+      // Calculate fuel cost
+      const requiredFuel = distances[distances.length - 1];
+      const fuelCost = minFuelCost(requiredFuel);
+      document.getElementById('fuel-cost').innerHTML = `
+        <h3>Fuel Cost Optimization:</h3>
+        ${fuelCost === -1 ? 
+          '<p>Fuel optimization failed</p>' : 
+          `<p>Minimum fuel cost: ${fuelCost} taka</p>`}
+      `;
+
+      document.getElementById('results').style.display = 'block';
+    }
+  </script>
+</body>
+</html>
